@@ -2,6 +2,8 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Uzoma.Api.Data;
 using Uzoma.Api.Models;
+using Uzoma.Api.Security;
+
 
 namespace Uzoma.Api.Controllers
 {
@@ -34,6 +36,7 @@ namespace Uzoma.Api.Controllers
 
         // POST: api/products
         [HttpPost]
+        [AdminAuth]
         public async Task<ActionResult<Product>> CreateProduct(Product product)
         {
             product.CreatedAt = DateTime.UtcNow;
@@ -44,26 +47,19 @@ namespace Uzoma.Api.Controllers
 
         // PUT: api/products/{id}
         [HttpPut("{id}")]
+        [AdminAuth]
         public async Task<IActionResult> UpdateProduct(int id, Product product)
         {
             if (id != product.Id) return BadRequest();
             _context.Entry(product).State = EntityState.Modified;
-
-            try
-            {
-                await _context.SaveChangesAsync();
-            }
-            catch (DbUpdateConcurrencyException)
-            {
-                if (!_context.Products.Any(e => e.Id == id)) return NotFound();
-                throw;
-            }
-
+            await _context.SaveChangesAsync();
             return NoContent();
         }
 
+
         // DELETE: api/products/{id}
         [HttpDelete("{id}")]
+        [AdminAuth]
         public async Task<IActionResult> DeleteProduct(int id)
         {
             var product = await _context.Products.FindAsync(id);
