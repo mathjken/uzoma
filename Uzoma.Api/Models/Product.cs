@@ -12,7 +12,8 @@ namespace Uzoma.Api.Models
 
         public string ImageUrl { get; set; } = string.Empty;
 
-        public string Category { get; set; } = string.Empty;
+        public int CategoryId { get; set; }
+        public Category Category { get; set; } = null!;
 
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     }

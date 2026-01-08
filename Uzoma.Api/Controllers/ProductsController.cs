@@ -4,7 +4,6 @@ using Uzoma.Api.Data;
 using Uzoma.Api.Models;
 using Uzoma.Api.Security;
 
-
 namespace Uzoma.Api.Controllers
 {
     [ApiController]
@@ -30,42 +29,53 @@ namespace Uzoma.Api.Controllers
         public async Task<ActionResult<Product>> GetProduct(int id)
         {
             var product = await _context.Products.FindAsync(id);
-            if (product == null) return NotFound();
+
+            if (product == null)
+                return NotFound();
+
             return product;
         }
 
-        // POST: api/products
+        // POST: api/products (Admin only)
         [HttpPost]
         [AdminAuth]
         public async Task<ActionResult<Product>> CreateProduct(Product product)
         {
             product.CreatedAt = DateTime.UtcNow;
+
             _context.Products.Add(product);
             await _context.SaveChangesAsync();
+
             return CreatedAtAction(nameof(GetProduct), new { id = product.Id }, product);
         }
 
-        // PUT: api/products/{id}
+        // PUT: api/products/{id} (Admin only)
         [HttpPut("{id}")]
         [AdminAuth]
         public async Task<IActionResult> UpdateProduct(int id, Product product)
         {
-            if (id != product.Id) return BadRequest();
+            if (id != product.Id)
+                return BadRequest();
+
             _context.Entry(product).State = EntityState.Modified;
             await _context.SaveChangesAsync();
+
             return NoContent();
         }
 
-
-        // DELETE: api/products/{id}
+        // DELETE: api/products/{id} (Admin only)
         [HttpDelete("{id}")]
         [AdminAuth]
         public async Task<IActionResult> DeleteProduct(int id)
         {
             var product = await _context.Products.FindAsync(id);
-            if (product == null) return NotFound();
+
+            if (product == null)
+                return NotFound();
+
             _context.Products.Remove(product);
             await _context.SaveChangesAsync();
+
             return NoContent();
         }
     }
