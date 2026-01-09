@@ -19,7 +19,7 @@ string connectionString;
 
 if (!string.IsNullOrEmpty(databaseUrl))
 {
-    // Heroku format → Npgsql format
+    // Convert Heroku DATABASE_URL to Npgsql connection string
     var uri = new Uri(databaseUrl);
     var userInfo = uri.UserInfo.Split(':');
 
@@ -87,12 +87,6 @@ var app = builder.Build();
 // --------------------
 // Middleware
 // --------------------
-if (app.Environment.IsDevelopment())
-{
-    app.UseSwagger();
-    app.UseSwaggerUI();
-}
-
 app.UseRouting();
 app.UseCors("AllowFrontend");
 
@@ -100,18 +94,43 @@ app.UseAuthentication();
 app.UseAuthorization();
 
 // --------------------
-// Database seeding
+// Swagger for all environments
+// --------------------
+app.UseSwagger();
+app.UseSwaggerUI(c =>
+{
+    c.SwaggerEndpoint("/swagger/v1/swagger.json", "Uzoma API V1");
+});
+
+// --------------------
+// Root endpoint
+// --------------------
+app.MapGet("/", () => "Uzoma API is running!");
+
+// --------------------
+// Map Controllers
+// --------------------
+app.MapControllers();
+
+// --------------------
+// Database migrations & seeding
 // --------------------
 using (var scope = app.Services.CreateScope())
 {
     var context = scope.ServiceProvider.GetRequiredService<UzomaDbContext>();
 
-    // Apply pending migrations automatically
-    context.Database.Migrate();
+    try
+    {
+        // Apply only pending migrations
+        context.Database.Migrate();
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"Migration failed (may already exist): {ex.Message}");
+    }
 
-    // Seed the database
+    // Seed database if needed
     DbInitializer.Initialize(context);
 }
 
-app.MapControllers();
 app.Run();
