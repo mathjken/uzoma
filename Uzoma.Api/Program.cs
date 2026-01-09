@@ -105,6 +105,11 @@ app.UseAuthorization();
 using (var scope = app.Services.CreateScope())
 {
     var context = scope.ServiceProvider.GetRequiredService<UzomaDbContext>();
+
+    // Apply pending migrations automatically
+    context.Database.Migrate();
+
+    // Seed the database
     DbInitializer.Initialize(context);
 }
 
