@@ -7,36 +7,63 @@ using Uzoma.Api.Data;
 var builder = WebApplication.CreateBuilder(args);
 
 // --------------------
-// Services
+// Controllers
 // --------------------
-
-// Add controllers
 builder.Services.AddControllers();
 
-// Configure EF Core with SQL Server
+// --------------------
+// Database (PostgreSQL)
+// --------------------
+string? databaseUrl = builder.Configuration["DATABASE_URL"];
+string connectionString;
+
+if (!string.IsNullOrEmpty(databaseUrl))
+{
+    // Heroku format → Npgsql format
+    var uri = new Uri(databaseUrl);
+    var userInfo = uri.UserInfo.Split(':');
+
+    connectionString =
+        $"Host={uri.Host};" +
+        $"Port={uri.Port};" +
+        $"Database={uri.AbsolutePath.TrimStart('/')};" +
+        $"Username={userInfo[0]};" +
+        $"Password={userInfo[1]};" +
+        $"SSL Mode=Require;Trust Server Certificate=true";
+}
+else
+{
+    // Local PostgreSQL
+    connectionString = builder.Configuration.GetConnectionString("DefaultConnection")!;
+}
+
 builder.Services.AddDbContext<UzomaDbContext>(options =>
-    options.UseSqlServer(
-        builder.Configuration.GetConnectionString("DefaultConnection")
-    )
+    options.UseNpgsql(connectionString)
 );
 
-// Swagger/OpenAPI
+// --------------------
+// Swagger
+// --------------------
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
-// CORS — allow React frontend
+// --------------------
+// CORS
+// --------------------
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowFrontend", policy =>
     {
         policy
-            .WithOrigins("http://localhost:5173") // frontend URL
+            .AllowAnyOrigin()
             .AllowAnyHeader()
             .AllowAnyMethod();
     });
 });
 
+// --------------------
 // JWT Authentication
+// --------------------
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
     {
@@ -58,35 +85,28 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
 var app = builder.Build();
 
 // --------------------
-// Middleware pipeline
+// Middleware
 // --------------------
-
-// Swagger in development
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
     app.UseSwaggerUI();
 }
 
-// Routing
 app.UseRouting();
-
-// CORS must be **after routing** and before auth
 app.UseCors("AllowFrontend");
 
-// JWT Authentication & Authorization
 app.UseAuthentication();
 app.UseAuthorization();
 
-// Seed database
+// --------------------
+// Database seeding
+// --------------------
 using (var scope = app.Services.CreateScope())
 {
     var context = scope.ServiceProvider.GetRequiredService<UzomaDbContext>();
     DbInitializer.Initialize(context);
 }
 
-// Map all controllers (Auth, Categories, Orders, Products)
 app.MapControllers();
-
-// Run the app
 app.Run();
