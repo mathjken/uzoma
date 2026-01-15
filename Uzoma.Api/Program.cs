@@ -2,14 +2,23 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using System.Text;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 using Uzoma.Api.Data;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // --------------------
-// Controllers
+// Controllers & JSON Formatting (FIXES THE DISAPPEARING ISSUE)
 // --------------------
-builder.Services.AddControllers();
+builder.Services.AddControllers()
+    .AddJsonOptions(options =>
+    {
+        // Forces camelCase (e.g., imageUrl instead of ImageUrl) to match your frontend
+        options.JsonSerializerOptions.PropertyNamingPolicy = JsonNamingPolicy.CamelCase;
+        // Prevents infinite loops if models reference each other
+        options.JsonSerializerOptions.ReferenceHandler = ReferenceHandler.IgnoreCycles;
+    });
 
 // --------------------
 // Database (PostgreSQL)
@@ -19,7 +28,6 @@ string connectionString;
 
 if (!string.IsNullOrEmpty(databaseUrl))
 {
-    // Convert Heroku DATABASE_URL to Npgsql connection string
     var uri = new Uri(databaseUrl);
     var userInfo = uri.UserInfo.Split(':');
 
@@ -33,7 +41,6 @@ if (!string.IsNullOrEmpty(databaseUrl))
 }
 else
 {
-    // Local PostgreSQL
     connectionString = builder.Configuration.GetConnectionString("DefaultConnection")!;
 }
 
@@ -48,7 +55,7 @@ builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
 // --------------------
-// CORS
+// CORS (ALLOWS YOUR LOCALHOST TO ACCESS HEROKU)
 // --------------------
 builder.Services.AddCors(options =>
 {
@@ -85,9 +92,11 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
 var app = builder.Build();
 
 // --------------------
-// Middleware
+// Middleware Order (CRITICAL)
 // --------------------
 app.UseRouting();
+
+// CORS must be here, after Routing and before Authentication
 app.UseCors("AllowFrontend");
 
 app.UseAuthentication();
@@ -121,15 +130,14 @@ using (var scope = app.Services.CreateScope())
 
     try
     {
-        // Apply only pending migrations
         context.Database.Migrate();
     }
     catch (Exception ex)
     {
-        Console.WriteLine($"Migration failed (may already exist): {ex.Message}");
+        Console.WriteLine($"Migration failed: {ex.Message}");
     }
 
-    // Seed database if needed
+    // This will run your fixed links and categories
     DbInitializer.Initialize(context);
 }
 
