@@ -7,66 +7,53 @@ namespace Uzoma.Api.Data
     {
         public static void Initialize(UzomaDbContext context)
         {
+            // Apply any pending migrations
             context.Database.Migrate();
 
-            // --------------------
-            // Seed Categories
-            // --------------------
-            if (!context.Categories.Any())
+            // Only seed products if the table is empty
+            if (context.Products.Any()) return;
+
+            var seedDate = DateTime.UtcNow;
+
+            var products = new List<Product>
             {
-                context.Categories.AddRange(
-                    new Category { Name = "Jackets", Slug = "jackets" },
-                    new Category { Name = "Shirts", Slug = "shirts" },
-                    new Category { Name = "Trousers", Slug = "trousers" },
-                    new Category { Name = "Suits", Slug = "suits" },
-                    new Category { Name = "Kaftans", Slug = "kaftans" }
-                );
+                // Jackets (CategoryId 1)
+                new() { Name = "Leather Biker Jacket", Price = 220, CategoryId = 1, ImageUrl = "https://images.unsplash.com/photo-1520975916090-3105956dac38", CreatedAt = seedDate, Description = "Premium leather biker jacket." },
+                new() { Name = "Denim Jacket", Price = 140, CategoryId = 1, ImageUrl = "https://images.unsplash.com/photo-1542060748-10c28b62716b", CreatedAt = seedDate, Description = "Classic blue denim." },
+                new() { Name = "Casual Weekend Jacket", Price = 130, CategoryId = 1, ImageUrl = "https://images.unsplash.com/photo-1541099649105-f69ad21f3246", CreatedAt = seedDate, Description = "Perfect for light weather." },
 
-                context.SaveChanges();
-            }
+                // Hoodies (CategoryId 2)
+                new() { Name = "Classic Pullover Hoodie", Price = 75, CategoryId = 2, ImageUrl = "https://images.unsplash.com/photo-1618354691321-75e01c4b56a2", CreatedAt = seedDate, Description = "Soft cotton blend." },
+                new() { Name = "Oversized Street Hoodie", Price = 85, CategoryId = 2, ImageUrl = "https://images.unsplash.com/photo-1593032465175-481ac7f4014f", CreatedAt = seedDate, Description = "Modern oversized fit." },
+                new() { Name = "Minimal Zip Hoodie", Price = 70, CategoryId = 2, ImageUrl = "https://images.unsplash.com/photo-1600180758890-6b94519a8ba6", CreatedAt = seedDate, Description = "Simple and clean." },
 
-            // --------------------
-            // Seed Products
-            // --------------------
-            if (!context.Products.Any())
-            {
-                var now = DateTime.UtcNow;
+                // Coats (CategoryId 3)
+                new() { Name = "Wool Trench Coat", Price = 260, CategoryId = 3, ImageUrl = "https://images.unsplash.com/photo-1512436991641-6745cdb1723f", CreatedAt = seedDate, Description = "Elegant winter wear." },
+                new() { Name = "Long Winter Coat", Price = 310, CategoryId = 3, ImageUrl = "https://images.unsplash.com/photo-1542060748-10c28b62716b", CreatedAt = seedDate, Description = "Maximum warmth." },
+                new() { Name = "Smart Casual Coat", Price = 210, CategoryId = 3, ImageUrl = "https://images.unsplash.com/photo-1503342217505-b0a15ec3261c", CreatedAt = seedDate, Description = "Versatile style." },
 
-                context.Products.AddRange(
+                // Sportswear (CategoryId 4)
+                new() { Name = "Athletic Training Jacket", Price = 95, CategoryId = 4, ImageUrl = "https://images.unsplash.com/photo-1592878904946-b3cd8ae243d0", CreatedAt = seedDate, Description = "Breathable fabric." },
+                new() { Name = "Running Track Top", Price = 80, CategoryId = 4, ImageUrl = "https://images.unsplash.com/photo-1600180758890-6b94519a8ba6", CreatedAt = seedDate, Description = "Built for speed." },
+                new() { Name = "Performance Sports Hoodie", Price = 90, CategoryId = 4, ImageUrl = "https://images.unsplash.com/photo-1592878904946-b3cd8ae243d0", CreatedAt = seedDate, Description = "Moisture-wicking tech." },
 
-                    // Jackets
-                    new Product { Name = "Premium Leather Jacket", Description = "Handcrafted leather jacket", Price = 219.99m, ImageUrl = "https://images.unsplash.com/photo-1591047139829-d91aecb6caea", CategoryId = 1, CreatedAt = now },
-                    new Product { Name = "Denim Jacket", Description = "Classic denim jacket", Price = 129.99m, ImageUrl = "https://images.unsplash.com/photo-1512436991641-6745cdb1723f", CategoryId = 1, CreatedAt = now },
-                    new Product { Name = "Bomber Jacket", Description = "Lightweight bomber jacket", Price = 99.99m, ImageUrl = "https://images.unsplash.com/photo-1520975916090-3105956dac38", CategoryId = 1, CreatedAt = now },
-                    new Product { Name = "Winter Parka", Description = "Insulated winter parka", Price = 189.99m, ImageUrl = "https://images.unsplash.com/photo-1602810318383-e386cc2a3ccf", CategoryId = 1, CreatedAt = now },
+                // Casual (CategoryId 5)
+                new() { Name = "Everyday Casual Shirt", Price = 60, CategoryId = 5, ImageUrl = "https://images.unsplash.com/photo-1503342217505-b0a15ec3261c", CreatedAt = seedDate, Description = "Breathable linen." },
+                new() { Name = "Relaxed Fit Trousers", Price = 90, CategoryId = 5, ImageUrl = "https://images.unsplash.com/photo-1585386959984-a41552231693", CreatedAt = seedDate, Description = "Comfort for all day." },
 
-                    // Shirts
-                    new Product { Name = "Classic White Shirt", Description = "Formal cotton shirt", Price = 39.99m, ImageUrl = "https://images.unsplash.com/photo-1523381294911-8d3cead13475", CategoryId = 2, CreatedAt = now },
-                    new Product { Name = "Linen Shirt", Description = "Breathable casual shirt", Price = 44.99m, ImageUrl = "https://images.unsplash.com/photo-1596755094514-f87e34085b2c", CategoryId = 2, CreatedAt = now },
-                    new Product { Name = "Striped Office Shirt", Description = "Slim fit office shirt", Price = 49.99m, ImageUrl = "https://images.unsplash.com/photo-1600180758890-6b94519a8ba6", CategoryId = 2, CreatedAt = now },
-                    new Product { Name = "Short Sleeve Shirt", Description = "Relaxed summer shirt", Price = 29.99m, ImageUrl = "https://images.unsplash.com/photo-1603252109303-2751441dd157", CategoryId = 2, CreatedAt = now },
+                // Formal (CategoryId 6)
+                new() { Name = "Tailored Formal Suit", Price = 480, CategoryId = 6, ImageUrl = "https://images.unsplash.com/photo-1593030761757-71fae45fa0e7", CreatedAt = seedDate, Description = "Premium Italian wool." },
+                new() { Name = "Classic Blazer", Price = 230, CategoryId = 6, ImageUrl = "https://images.unsplash.com/photo-1521334884684-d80222895322", CreatedAt = seedDate, Description = "Sharp office look." },
+                new() { Name = "Formal Waistcoat", Price = 160, CategoryId = 6, ImageUrl = "https://images.unsplash.com/photo-1593030761757-71fae45fa0e7", CreatedAt = seedDate, Description = "The finishing touch." },
 
-                    // Trousers
-                    new Product { Name = "Slim Fit Jeans", Description = "Dark wash jeans", Price = 59.99m, ImageUrl = "https://images.unsplash.com/photo-1541099649105-f69ad21f3246", CategoryId = 3, CreatedAt = now },
-                    new Product { Name = "Chino Trousers", Description = "Smart casual chinos", Price = 54.99m, ImageUrl = "https://images.unsplash.com/photo-1503342217505-b0a15ec3261c", CategoryId = 3, CreatedAt = now },
-                    new Product { Name = "Formal Black Trousers", Description = "Business trousers", Price = 69.99m, ImageUrl = "https://images.unsplash.com/photo-1584865288642-42078c1d4f6d", CategoryId = 3, CreatedAt = now },
-                    new Product { Name = "Cargo Pants", Description = "Utility cargo pants", Price = 64.99m, ImageUrl = "https://images.unsplash.com/photo-1618354691258-92e68f0f7e52", CategoryId = 3, CreatedAt = now },
+                // Outerwear (CategoryId 7)
+                new() { Name = "Puffer Jacket", Price = 180, CategoryId = 7, ImageUrl = "https://images.unsplash.com/photo-1617957743043-3d85b9e2f14b", CreatedAt = seedDate, Description = "Insulated puffer." },
+                new() { Name = "Windbreaker Shell", Price = 120, CategoryId = 7, ImageUrl = "https://images.unsplash.com/photo-1514996937319-344454492b37", CreatedAt = seedDate, Description = "Water resistant." },
+                new() { Name = "Lightweight Outer Shell", Price = 110, CategoryId = 7, ImageUrl = "https://images.unsplash.com/photo-1514996937319-344454492b37", CreatedAt = seedDate, Description = "Compact and light." }
+            };
 
-                    // Suits
-                    new Product { Name = "Navy Suit", Description = "Two-piece navy suit", Price = 299.99m, ImageUrl = "https://images.unsplash.com/photo-1521335629791-ce4aec67dd53", CategoryId = 4, CreatedAt = now },
-                    new Product { Name = "Grey Business Suit", Description = "Corporate grey suit", Price = 319.99m, ImageUrl = "https://images.unsplash.com/photo-1593032465175-481ac7f401a0", CategoryId = 4, CreatedAt = now },
-                    new Product { Name = "Wedding Suit", Description = "Elegant wedding suit", Price = 399.99m, ImageUrl = "https://images.unsplash.com/photo-1592878904946-b3cd8ae243d0", CategoryId = 4, CreatedAt = now },
-                    new Product { Name = "Double Breasted Suit", Description = "Luxury tailored suit", Price = 449.99m, ImageUrl = "https://images.unsplash.com/photo-1539533113208-f6df8cc8b543", CategoryId = 4, CreatedAt = now },
-
-                    // Kaftans
-                    new Product { Name = "Traditional Kaftan", Description = "African traditional wear", Price = 149.99m, ImageUrl = "https://images.unsplash.com/photo-1602810318383-e386cc2a3ccf", CategoryId = 5, CreatedAt = now },
-                    new Product { Name = "Embroidered Kaftan", Description = "Luxury embroidered kaftan", Price = 179.99m, ImageUrl = "https://images.unsplash.com/photo-1582719478181-2c4dbe45a4b7", CategoryId = 5, CreatedAt = now },
-                    new Product { Name = "Modern Kaftan", Description = "Modern African kaftan", Price = 159.99m, ImageUrl = "https://images.unsplash.com/photo-1620799139507-2a76f79c82f3", CategoryId = 5, CreatedAt = now },
-                    new Product { Name = "Casual Kaftan", Description = "Lightweight casual kaftan", Price = 119.99m, ImageUrl = "https://images.unsplash.com/photo-1618221195710-dd6c94d9b6a1", CategoryId = 5, CreatedAt = now }
-                );
-
-                context.SaveChanges();
-            }
+            context.Products.AddRange(products);
+            context.SaveChanges();
         }
     }
 }
