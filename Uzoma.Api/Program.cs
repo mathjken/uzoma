@@ -2,176 +2,127 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using System.Text;
-using System.Text.Json;
-using System.Text.Json.Serialization;
-using Uzoma.Api.Data;
+using uzoma_api.Data;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// --------------------
-// Controllers & JSON Formatting
-// --------------------
-builder.Services.AddControllers()
-    .AddJsonOptions(options =>
-    {
-        // Forces camelCase for frontend
-        options.JsonSerializerOptions.PropertyNamingPolicy = JsonNamingPolicy.CamelCase;
-        // Prevents reference loops
-        options.JsonSerializerOptions.ReferenceHandler = ReferenceHandler.IgnoreCycles;
-    });
+// ------------------------
+// Add services
+// ------------------------
 
-// --------------------
-// Database (PostgreSQL)
-// --------------------
-string? databaseUrl = builder.Configuration["DATABASE_URL"];
-string connectionString;
+// Add controllers
+builder.Services.AddControllers();
 
-if (!string.IsNullOrEmpty(databaseUrl))
-{
-    try
-    {
-        var uri = new Uri(databaseUrl);
-        var userInfo = uri.UserInfo.Split(':');
-
-        connectionString =
-            $"Host={uri.Host};" +
-            $"Port={uri.Port};" +
-            $"Database={uri.AbsolutePath.TrimStart('/')};" +
-            $"Username={userInfo[0]};" +
-            $"Password={userInfo[1]};" +
-            $"SSL Mode=Require;Trust Server Certificate=true";
-
-        Console.WriteLine("Using Heroku DATABASE_URL.");
-    }
-    catch (Exception ex)
-    {
-        Console.WriteLine($"Error parsing DATABASE_URL: {ex}");
-        throw;
-    }
-}
-else
-{
-    connectionString = builder.Configuration.GetConnectionString("DefaultConnection")!;
-    Console.WriteLine("Using DefaultConnection from appsettings.json.");
-}
-
-builder.Services.AddDbContext<UzomaDbContext>(options =>
-    options.UseNpgsql(connectionString)
-);
-
-// --------------------
-// Swagger
-// --------------------
+// Add Swagger for testing (optional)
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
-// --------------------
+// ------------------------
 // CORS
-// --------------------
+// ------------------------
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowFrontend", policy =>
     {
         policy
-            .AllowAnyOrigin()
+            .WithOrigins("http://localhost:5173") // React dev server
             .AllowAnyHeader()
             .AllowAnyMethod();
     });
 });
 
-// --------------------
+// ------------------------
+// Database
+// ------------------------
+var databaseUrl = builder.Configuration["DATABASE_URL"];
+if (string.IsNullOrEmpty(databaseUrl))
+{
+    Console.WriteLine("DATABASE_URL is not set!");
+}
+
+var connectionString = databaseUrl != null
+    ? new Npgsql.NpgsqlConnectionStringBuilder(databaseUrl) { 
+        // Heroku requires SSL
+        SslMode = SslMode.Require,
+        TrustServerCertificate = true
+    }.ToString()
+    : builder.Configuration.GetConnectionString("DefaultConnection");
+
+builder.Services.AddDbContext<ApplicationDbContext>(options =>
+    options.UseNpgsql(connectionString));
+
+// ------------------------
 // JWT Authentication
-// --------------------
+// ------------------------
 var jwtKey = builder.Configuration["Jwt:Key"];
 var jwtIssuer = builder.Configuration["Jwt:Issuer"];
 var jwtAudience = builder.Configuration["Jwt:Audience"];
 
-if (string.IsNullOrEmpty(jwtKey) || string.IsNullOrEmpty(jwtIssuer) || string.IsNullOrEmpty(jwtAudience))
+if (string.IsNullOrEmpty(jwtKey))
+    Console.WriteLine("JWT Key not set in configuration!");
+
+builder.Services.AddAuthentication(options =>
 {
-    Console.WriteLine("WARNING: JWT environment variables are missing!");
-}
-
-builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
-    .AddJwtBearer(options =>
+    options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
+    options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
+})
+.AddJwtBearer(options =>
+{
+    options.TokenValidationParameters = new TokenValidationParameters
     {
-        options.TokenValidationParameters = new TokenValidationParameters
-        {
-            ValidateIssuer = true,
-            ValidateAudience = true,
-            ValidateLifetime = true,
-            ValidateIssuerSigningKey = true,
-
-            ValidIssuer = jwtIssuer,
-            ValidAudience = jwtAudience,
-            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey ?? "FallbackSecretKey123!"))
-        };
-    });
+        ValidateIssuer = true,
+        ValidateAudience = true,
+        ValidateLifetime = true,
+        ValidateIssuerSigningKey = true,
+        ValidIssuer = jwtIssuer,
+        ValidAudience = jwtAudience,
+        IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey))
+    };
+});
 
 var app = builder.Build();
 
-// --------------------
-// Middleware Order
-// --------------------
-app.UseRouting();
-app.UseCors("AllowFrontend");
-app.UseAuthentication();
-app.UseAuthorization();
-
-// --------------------
-// Swagger
-// --------------------
-app.UseSwagger();
-app.UseSwaggerUI(c =>
-{
-    c.SwaggerEndpoint("/swagger/v1/swagger.json", "Uzoma API V1");
-});
-
-// --------------------
-// Root endpoint
-// --------------------
-app.MapGet("/", () => "Uzoma API is running!");
-
-// --------------------
-// Map Controllers
-// --------------------
-app.MapControllers();
-
-// --------------------
-// Database migrations & seeding
-// --------------------
+// ------------------------
+// Apply Migrations & Seed
+// ------------------------
 using (var scope = app.Services.CreateScope())
 {
-    var context = scope.ServiceProvider.GetRequiredService<UzomaDbContext>();
-
+    var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
     try
     {
         context.Database.Migrate();
-        Console.WriteLine("Database migration succeeded.");
-    }
-    catch (Exception ex)
-    {
-        Console.WriteLine($"Database migration failed: {ex}");
-    }
-
-    try
-    {
         DbInitializer.Initialize(context);
-        Console.WriteLine("Database seeding completed.");
+        Console.WriteLine("Database migrated and seeded successfully.");
     }
     catch (Exception ex)
     {
-        Console.WriteLine($"Database seeding failed: {ex}");
+        Console.WriteLine($"Database migration/seeding failed: {ex}");
     }
 }
 
-// --------------------
-// Heroku PORT binding
-// --------------------
+// ------------------------
+// Middleware
+// ------------------------
+if (app.Environment.IsDevelopment())
+{
+    app.UseSwagger();
+    app.UseSwaggerUI();
+}
+
+app.UseRouting();
+
+// CORS must come before Authentication & Authorization
+app.UseCors("AllowFrontend");
+
+app.UseAuthentication();
+app.UseAuthorization();
+
+app.MapControllers();
+
+// ------------------------
+// Heroku port binding
+// ------------------------
 var port = Environment.GetEnvironmentVariable("PORT") ?? "5000";
 app.Urls.Add($"http://*:{port}");
-Console.WriteLine($"Listening on port {port}");
 
-// --------------------
-// Run the app
-// --------------------
 app.Run();
