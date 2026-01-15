@@ -9,14 +9,14 @@ using Uzoma.Api.Data;
 var builder = WebApplication.CreateBuilder(args);
 
 // --------------------
-// Controllers & JSON Formatting (FIXES THE DISAPPEARING ISSUE)
+// Controllers & JSON Formatting
 // --------------------
 builder.Services.AddControllers()
     .AddJsonOptions(options =>
     {
-        // Forces camelCase (e.g., imageUrl instead of ImageUrl) to match your frontend
+        // Forces camelCase for frontend
         options.JsonSerializerOptions.PropertyNamingPolicy = JsonNamingPolicy.CamelCase;
-        // Prevents infinite loops if models reference each other
+        // Prevents reference loops
         options.JsonSerializerOptions.ReferenceHandler = ReferenceHandler.IgnoreCycles;
     });
 
@@ -28,20 +28,31 @@ string connectionString;
 
 if (!string.IsNullOrEmpty(databaseUrl))
 {
-    var uri = new Uri(databaseUrl);
-    var userInfo = uri.UserInfo.Split(':');
+    try
+    {
+        var uri = new Uri(databaseUrl);
+        var userInfo = uri.UserInfo.Split(':');
 
-    connectionString =
-        $"Host={uri.Host};" +
-        $"Port={uri.Port};" +
-        $"Database={uri.AbsolutePath.TrimStart('/')};" +
-        $"Username={userInfo[0]};" +
-        $"Password={userInfo[1]};" +
-        $"SSL Mode=Require;Trust Server Certificate=true";
+        connectionString =
+            $"Host={uri.Host};" +
+            $"Port={uri.Port};" +
+            $"Database={uri.AbsolutePath.TrimStart('/')};" +
+            $"Username={userInfo[0]};" +
+            $"Password={userInfo[1]};" +
+            $"SSL Mode=Require;Trust Server Certificate=true";
+
+        Console.WriteLine("Using Heroku DATABASE_URL.");
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"Error parsing DATABASE_URL: {ex}");
+        throw;
+    }
 }
 else
 {
     connectionString = builder.Configuration.GetConnectionString("DefaultConnection")!;
+    Console.WriteLine("Using DefaultConnection from appsettings.json.");
 }
 
 builder.Services.AddDbContext<UzomaDbContext>(options =>
@@ -55,7 +66,7 @@ builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
 // --------------------
-// CORS (ALLOWS YOUR LOCALHOST TO ACCESS HEROKU)
+// CORS
 // --------------------
 builder.Services.AddCors(options =>
 {
@@ -71,6 +82,15 @@ builder.Services.AddCors(options =>
 // --------------------
 // JWT Authentication
 // --------------------
+var jwtKey = builder.Configuration["Jwt:Key"];
+var jwtIssuer = builder.Configuration["Jwt:Issuer"];
+var jwtAudience = builder.Configuration["Jwt:Audience"];
+
+if (string.IsNullOrEmpty(jwtKey) || string.IsNullOrEmpty(jwtIssuer) || string.IsNullOrEmpty(jwtAudience))
+{
+    Console.WriteLine("WARNING: JWT environment variables are missing!");
+}
+
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
     {
@@ -81,29 +101,24 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             ValidateLifetime = true,
             ValidateIssuerSigningKey = true,
 
-            ValidIssuer = builder.Configuration["Jwt:Issuer"],
-            ValidAudience = builder.Configuration["Jwt:Audience"],
-            IssuerSigningKey = new SymmetricSecurityKey(
-                Encoding.UTF8.GetBytes(builder.Configuration["Jwt:Key"]!)
-            )
+            ValidIssuer = jwtIssuer,
+            ValidAudience = jwtAudience,
+            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey ?? "FallbackSecretKey123!"))
         };
     });
 
 var app = builder.Build();
 
 // --------------------
-// Middleware Order (CRITICAL)
+// Middleware Order
 // --------------------
 app.UseRouting();
-
-// CORS must be here, after Routing and before Authentication
 app.UseCors("AllowFrontend");
-
 app.UseAuthentication();
 app.UseAuthorization();
 
 // --------------------
-// Swagger for all environments
+// Swagger
 // --------------------
 app.UseSwagger();
 app.UseSwaggerUI(c =>
@@ -131,14 +146,32 @@ using (var scope = app.Services.CreateScope())
     try
     {
         context.Database.Migrate();
+        Console.WriteLine("Database migration succeeded.");
     }
     catch (Exception ex)
     {
-        Console.WriteLine($"Migration failed: {ex.Message}");
+        Console.WriteLine($"Database migration failed: {ex}");
     }
 
-    // This will run your fixed links and categories
-    DbInitializer.Initialize(context);
+    try
+    {
+        DbInitializer.Initialize(context);
+        Console.WriteLine("Database seeding completed.");
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"Database seeding failed: {ex}");
+    }
 }
 
+// --------------------
+// Heroku PORT binding
+// --------------------
+var port = Environment.GetEnvironmentVariable("PORT") ?? "5000";
+app.Urls.Add($"http://*:{port}");
+Console.WriteLine($"Listening on port {port}");
+
+// --------------------
+// Run the app
+// --------------------
 app.Run();
