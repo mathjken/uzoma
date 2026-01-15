@@ -1,0 +1,1 @@
+export const API_BASE_URL = 'https://uzoma-api2-8f4a6d00f77a.herokuapp.com/api';
