@@ -1,0 +1,6 @@
+@Uzoma.Api_HostAddress = http://localhost:5248
+
+GET {{Uzoma.Api_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
